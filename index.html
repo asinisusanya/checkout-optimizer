@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supermarket Checkout Queue Optimizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 600px;
+        }
+
+        .input-panel {
+            background: #f8f9ff;
+            padding: 30px;
+            border-right: 1px solid #e0e6ff;
+        }
+
+        .results-panel {
+            padding: 30px;
+            overflow-y: auto;
+            max-height: 80vh;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .analyze-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .metric-card {
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .metric-label {
+            color: #718096;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .recommendation {
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .recommendation.warning {
+            background: #fffaf0;
+            border-color: #fbd38d;
+        }
+
+        .recommendation h4 {
+            margin-bottom: 10px;
+            color: #2d3748;
+        }
+
+        .status-optimal {
+            color: #38a169;
+            font-weight: bold;
+        }
+
+        .status-warning {
+            color: #d69e2e;
+            font-weight: bold;
+        }
+
+        .chart-container {
+            margin: 20px 0;
+            height: 300px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f7fafc;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+            }
+            
+            .input-panel {
+                border-right: none;
+                border-bottom: 1px solid #e0e6ff;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛒 Checkout Queue Optimizer</h1>
+            <p>AI-Powered Operations Research for Supermarket Efficiency</p>
+        </div>
+
+        <div class="chat-container">
+            <div class="input-panel">
+                <h3 style="margin-bottom: 20px; color: #4a5568;">📊 Scenario Parameters</h3>
+                
+                <div class="form-group">
+                    <label for="counters">Number of Checkout Counters</label>
+                    <input type="number" id="counters" value="6" min="1" max="20">
+                </div>
+
+                <div class="form-group">
+                    <label for="arrival-rate">Customer Arrival Rate (per minute)</label>
+                    <input type="number" id="arrival-rate" value="12" min="1" max="100" step="0.1">
+                </div>
+
+                <div class="form-group">
+                    <label for="service-time">Average Service Time (seconds)</label>
+                    <input type="number" id="service-time" value="90" min="10" max="600">
+                </div>
+
+                <div class="form-group">
+                    <label for="max-wait">Maximum Acceptable Wait Time (minutes)</label>
+                    <input type="number" id="max-wait" value="3" min="0.5" max="15" step="0.5">
+                </div>
+
+                <button class="analyze-btn" onclick="analyzeQueue()">
+                    🔍 Analyze & Optimize
+                </button>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Analyzing queue performance...</p>
+                </div>
+            </div>
+
+            <div class="results-panel">
+                <div id="welcome" style="text-align: center; padding: 50px 20px; color: #718096;">
+                    <h3>👋 Welcome to Queue Optimizer!</h3>
+                    <p style="margin-top: 15px;">Enter your supermarket parameters on the left and click "Analyze & Optimize" to get AI-powered recommendations for your checkout system.</p>
+                    <div style="margin-top: 30px; font-size: 48px;">🛍️</div>
+                </div>
+
+                <div class="results" id="results">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentChart = null;
+
+        function analyzeQueue() {
+            // Get input values
+            const counters = parseInt(document.getElementById('counters').value);
+            const arrivalRate = parseFloat(document.getElementById('arrival-rate').value);
+            const serviceTime = parseInt(document.getElementById('service-time').value);
+            const maxWait = parseFloat(document.getElementById('max-wait').value);
+
+            // Show loading
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('welcome').style.display = 'none';
+            document.getElementById('results').classList.remove('show');
+
+            // Simulate processing delay
+            setTimeout(() => {
+                const analysis = performQueueAnalysis(counters, arrivalRate, serviceTime, maxWait);
+                displayResults(analysis);
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('results').classList.add('show');
+            }, 1500);
+        }
+
+        function performQueueAnalysis(counters, arrivalRate, serviceTime, maxWait) {
+            // Convert service time to minutes
+            const serviceRate = 60 / serviceTime; // customers per minute per server
+            const totalServiceRate = serviceRate * counters;
+            
+            // Queueing theory calculations (M/M/c model)
+            const utilization = arrivalRate / totalServiceRate;
+            const rho = arrivalRate / serviceRate; // traffic intensity per server
+            
+            // Calculate performance metrics
+            let avgWaitTime, avgQueueLength, throughput;
+            
+            if (utilization >= 1) {
+                // System is unstable
+                avgWaitTime = Infinity;
+                avgQueueLength = Infinity;
+                throughput = totalServiceRate;
+            } else {
+                // Erlang C formula approximation for average wait time
+                const c = counters;
+                const erlangC = calculateErlangC(rho, c);
+                avgWaitTime = (erlangC / (c * serviceRate - arrivalRate)) * 60; // in seconds, convert to minutes
+                avgWaitTime = avgWaitTime / 60;
+                
+                // Little's Law: L = λW
+                avgQueueLength = arrivalRate * avgWaitTime;
+                throughput = Math.min(arrivalRate, totalServiceRate);
+            }
+
+            // Determine optimal number of cashiers
+            let optimalCashiers = counters;
+            let tempWaitTime = avgWaitTime;
+            
+            // Find minimum cashiers needed
+            for (let c = 1; c <= 20; c++) {
+                const tempServiceRate = serviceRate * c;
+                const tempUtil = arrivalRate / tempServiceRate;
+                
+                if (tempUtil < 1) {
+                    const tempErlangC = calculateErlangC(arrivalRate / serviceRate, c);
+                    tempWaitTime = (tempErlangC / (c * serviceRate - arrivalRate)) * 60 / 60;
+                    
+                    if (tempWaitTime <= maxWait) {
+                        optimalCashiers = c;
+                        break;
+                    }
+                }
+            }
+
+            // Generate recommendations
+            const recommendations = generateRecommendations(
+                counters, optimalCashiers, avgWaitTime, maxWait, utilization
+            );
+
+            return {
+                inputs: { counters, arrivalRate, serviceTime, maxWait },
+                metrics: {
+                    avgWaitTime: Math.max(0, avgWaitTime),
+                    avgQueueLength: Math.max(0, avgQueueLength),
+                    utilization: utilization * 100,
+                    throughput,
+                    optimalCashiers
+                },
+                recommendations,
+                isOptimal: avgWaitTime <= maxWait && utilization < 0.9
+            };
+        }
+
+        function calculateErlangC(rho, c) {
+            // Simplified Erlang C calculation
+            let sum = 0;
+            for (let k = 0; k < c; k++) {
+                sum += Math.pow(rho, k) / factorial(k);
+            }
+            const numerator = Math.pow(rho, c) / factorial(c);
+            const denominator = sum + numerator / (1 - rho / c);
+            return numerator / denominator;
+        }
+
+        function factorial(n) {
+            if (n <= 1) return 1;
+            return n * factorial(n - 1);
+        }
+
+        function generateRecommendations(current, optimal, waitTime, maxWait, utilization) {
+            const recommendations = [];
+            
+            if (waitTime <= maxWait && utilization < 0.9) {
+                recommendations.push({
+                    type: 'optimal',
+                    title: '✅ System is Well Optimized',
+                    message: 'Your current setup meets performance targets with good efficiency.'
+                });
+            } else {
+                if (current < optimal) {
+                    recommendations.push({
+                        type: 'warning',
+                        title: '⚠️ More Cashiers Needed',
+                        message: `Consider adding ${optimal - current} more active cashiers to reduce wait times.`
+                    });
+                }
+                
+                if (utilization > 0.9) {
+                    recommendations.push({
+                        type: 'warning',
+                        title: '⚠️ High System Load',
+                        message: 'System utilization is very high. Consider peak-hour staffing strategies.'
+                    });
+                }
+            }
+            
+            // Queue structure recommendations
+            if (current >= 4) {
+                recommendations.push({
+                    type: 'optimal',
+                    title: '💡 Queue Structure Suggestion',
+                    message: 'Consider implementing a single serpentine queue system for fairness and efficiency.'
+                });
+            }
+            
+            return recommendations;
+        }
+
+        function displayResults(analysis) {
+            const resultsDiv = document.getElementById('results');
+            
+            const html = `
+                <h3>🎯 Analysis Results</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0;">
+                    <div class="metric-card">
+                        <div class="metric-value">${analysis.metrics.avgWaitTime.toFixed(2)} min</div>
+                        <div class="metric-label">Average Wait Time</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${analysis.metrics.avgQueueLength.toFixed(1)}</div>
+                        <div class="metric-label">Average Queue Length</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${analysis.metrics.utilization.toFixed(1)}%</div>
+                        <div class="metric-label">System Utilization</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${analysis.metrics.optimalCashiers}</div>
+                        <div class="metric-label">Optimal Cashiers</div>
+                    </div>
+                </div>
+
+                <h4>📋 Scenario Summary</h4>
+                <table>
+                    <tr><th>Parameter</th><th>Value</th></tr>
+                    <tr><td>Available Counters</td><td>${analysis.inputs.counters}</td></tr>
+                    <tr><td>Customer Arrival Rate</td><td>${analysis.inputs.arrivalRate}/min</td></tr>
+                    <tr><td>Service Time</td><td>${analysis.inputs.serviceTime} seconds</td></tr>
+                    <tr><td>Max Acceptable Wait</td><td>${analysis.inputs.maxWait} minutes</td></tr>
+                    <tr><td><strong>Status</strong></td><td class="${analysis.isOptimal ? 'status-optimal' : 'status-warning'}">${analysis.isOptimal ? '✅ Optimal' : '⚠️ Needs Improvement'}</td></tr>
+                </table>
+
+                <h4>💡 AI Recommendations</h4>
+                ${analysis.recommendations.map(rec => `
+                    <div class="recommendation ${rec.type === 'warning' ? 'warning' : ''}">
+                        <h4>${rec.title}</h4>
+                        <p>${rec.message}</p>
+                    </div>
+                `).join('')}
+
+                <h4>📊 Performance Visualization</h4>
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+
+                <div style="margin-top: 30px; padding: 20px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+                    <h4>🧠 AI Analysis Explanation</h4>
+                    <p>This analysis uses <strong>Queueing Theory (M/M/c model)</strong> to simulate your supermarket checkout system. The AI considers customer arrival patterns, service times, and resource utilization to provide optimal staffing recommendations.</p>
+                    <ul style="margin-top: 10px; padding-left: 20px;">
+                        <li><strong>Wait Time:</strong> Calculated using Erlang C formula for multi-server queues</li>
+                        <li><strong>Utilization:</strong> Measures how busy your cashiers are (optimal: 70-85%)</li>
+                        <li><strong>Queue Length:</strong> Average number of customers waiting (Little's Law)</li>
+                    </ul>
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = html;
+            
+            // Create performance chart
+            createPerformanceChart(analysis);
+        }
+
+        function createPerformanceChart(analysis) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            if (currentChart) {
+                currentChart.destroy();
+            }
+            
+            // Simulate hourly performance data
+            const hours = ['9AM', '10AM', '11AM', '12PM', '1PM', '2PM', '3PM', '4PM', '5PM', '6PM'];
+            const baseWait = analysis.metrics.avgWaitTime;
+            const waitTimes = hours.map((_, i) => {
+                const factor = 0.7 + 0.6 * Math.sin((i - 2) * Math.PI / 8) + 0.3 * Math.random();
+                return Math.max(0.1, baseWait * factor);
+            });
+            
+            const queueLengths = waitTimes.map(wait => wait * analysis.inputs.arrivalRate / 60 * analysis.inputs.serviceTime);
+            
+            currentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hours,
+                    datasets: [{
+                        label: 'Average Wait Time (min)',
+                        data: waitTimes,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Queue Length',
+                        data: queueLengths,
+                        borderColor: '#f093fb',
+                        backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Predicted Hourly Performance'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Wait Time (minutes)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Queue Length'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize with default analysis
+        window.onload = function() {
+            // Auto-analyze after a short delay to show the welcome message first
+            setTimeout(() => {
+                if (document.getElementById('welcome').style.display !== 'none') {
+                    // Only auto-analyze if user hasn't clicked yet
+                }
+            }, 2000);
+        };
+    </script>
+</body>
+</html>
